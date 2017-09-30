@@ -6,9 +6,6 @@ import sys
 import os
 import logging
 import logging.handlers
-import lxml
-import io
-from bs4 import UnicodeDammit
 pattern_wp = r'''<WorldPosition>(?P<group1>[A-Za-z0-9]+)\s+(?P<group2>\d+)\s+(?P<group3>\d+\.\d{2})(?:\d+)?,(?P<group4>[A-Za-z0-9]+)\s+(?P<group5>\d+)\s+(?P<group6>\d+\.\d{2})(?:\d+)?,(?P<group7>(?:-|\+)?\d+\.\d+)</WorldPosition>'''
 pattern_xml_enc = r'''encoding="(?P<encoding>[^"]+)"'''
 
