@@ -6,8 +6,11 @@ import sys
 import os
 import logging
 import logging.handlers
+import lxml
 import io
-pattern = ur'''<WorldPosition>(?P<group1>[A-Za-z0-9]+)\s+(?P<group2>\d+)\s+(?P<group3>\d+\.\d{2})(?:\d+)?,(?P<group4>[A-Za-z0-9]+)\s+(?P<group5>\d+)\s+(?P<group6>\d+\.\d{2})(?:\d+)?,(?P<group7>(?:-|\+)?\d+\.\d+)</WorldPosition>'''
+from bs4 import UnicodeDammit
+pattern_wp = r'''<WorldPosition>(?P<group1>[A-Za-z0-9]+)\s+(?P<group2>\d+)\s+(?P<group3>\d+\.\d{2})(?:\d+)?,(?P<group4>[A-Za-z0-9]+)\s+(?P<group5>\d+)\s+(?P<group6>\d+\.\d{2})(?:\d+)?,(?P<group7>(?:-|\+)?\d+\.\d+)</WorldPosition>'''
+pattern_xml_enc = r'''encoding="(?P<encoding>[^"]+)"'''
 
 def init_logging():
     logger = logging.getLogger()
@@ -38,28 +41,43 @@ def usage():
    sys.stderr.write('%s source_file\r\n' % sys.argv[0])
    sys.stderr.write('e.g. %s C:\\some\\path\\file.xml\r\n' % sys.argv[0])
 
+def detect_encoding(file):
+    with open(file, 'r') as f:
+        first_line = f.readline()
+
+    match = re.search(pattern_xml_enc, first_line)
+    if match:
+        return match.groupdict()['encoding']
+    else:
+        return None
+
 if __name__ == "__main__":
     init_logging()
     log = logging.getLogger(__name__)
-    log.debug(u'caled with %s', sys.argv)
+    log.debug('caled with %s', sys.argv)
     if len(sys.argv) == 2:
+        log.debug('trying to identify the encoding of the file')
         source_file_path = sys.argv[1]
         if os.path.isfile(source_file_path):
-            orig_source_file_path = '%s.orig' % source_file_path
-            shutil.move(source_file_path, orig_source_file_path)
-            log.debug('moved %s to %s', source_file_path, orig_source_file_path)
-            orig = io.open(orig_source_file_path, 'r',  encoding="utf-8")
-            new = io.open(source_file_path, 'w', encoding="utf-8")
-            i = 1
-            for line in orig.readlines():
-                old_line = line
-                new_line = re.sub(pattern, "<WorldPosition>\g<group1>° \g<group2>' \g<group3>,\g<group4>° \g<group5>' \g<group6>,\g<group7></WorldPosition>", line)
-                if old_line != new_line:
-                    log.debug(u'changed line# %s %s to %s', i, old_line, new_line)
-                i += 1
-                new.write(new_line)
-            orig.close()
-            new.close()
+            encoding = detect_encoding(source_file_path)
+            if isinstance(encoding, basestring) and len(encoding) >= 3:
+                orig_source_file_path = '%s.orig' % source_file_path
+                shutil.move(source_file_path, orig_source_file_path)
+                log.debug('moved %s to %s', source_file_path, orig_source_file_path)
+                orig = open(orig_source_file_path, 'r')
+                new = open(source_file_path, 'w')
+                i = 1
+                for line in orig.readlines():
+                    old_line = line.decode(encoding)
+                    new_line = re.sub(pattern_wp, "<WorldPosition>\g<group1>° \g<group2>' \g<group3>,\g<group4>° \g<group5>' \g<group6>,\g<group7></WorldPosition>", old_line)
+                    if old_line != new_line:
+                        log.debug('changed line# %s %s to %s', i, old_line, new_line)
+                    i += 1
+                    new.write(new_line.encode(encoding))
+                orig.close()
+                new.close()
+            else:
+                log.error('Cannot get encoding from file %s', source_file_path)
         else:
             log.error('path %s is not a file', source_file_path)
     else:
